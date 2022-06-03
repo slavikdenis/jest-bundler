@@ -1,3 +1,7 @@
+/**
+ * 3. Execute our bundle using a runtime
+ */
+
 const modules = new Map();
 
 const define = (name, moduleFactory) => {
