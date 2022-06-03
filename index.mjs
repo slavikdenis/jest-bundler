@@ -60,6 +60,7 @@ const resolver = new Resolver.default(moduleMap, {
 const seen = new Set();
 const modules = new Map();
 const queue = [entryPoint];
+let id = 0;
 
 while (!!queue.length) {
 	// Pick first element from queue
@@ -84,9 +85,12 @@ while (!!queue.length) {
 	// Read the content of file (code)
 	const code = fs.readFileSync(module, 'utf-8');
 	// Extract body of the module (everything after `module.exports =`)
-	const moduleBody = code.match(/module\.exports\s+=\s+(.*?);/)?.[1] || '';
+	// const moduleBody = code.match(/module\.exports\s+=\s+(.*?);/)?.[1] || '';
 	const metadata = {
-		code: moduleBody || code,
+		// Assign an unique ID to each module
+		id: id++,
+		// code: moduleBody || code,
+		code,
 		dependencyMap,
 	};
 	modules.set(module, metadata);
@@ -106,26 +110,42 @@ console.log(chalk.bold(`❯ Found ${chalk.blue(seen.size)} files`));
 
 console.log(chalk.bold(`❯ Serializing bundle`));
 
+// Wrap modules with `define(<id>, function(module, exports, require) { <code> });` [see `require.js`]
+const wrapModule = (id, code) =>
+	`define(${id}, function(module, exports, require) {\n${code}});`;
+
+// Array to contain code of each module
+const output = [];
+
 // Go through each module (backwards, to process the entry-point last)
 for (const [module, metadata] of Array.from(modules).reverse()) {
-	let { code } = metadata;
+	let { id, code } = metadata;
 	for (const [dependencyName, dependencyPath] of metadata.dependencyMap) {
-		// Inline the module body of the dependency into the module that requires it
+		const dependency = modules.get(dependencyPath);
+		// Swap out the reference the required module with the generated module.
+		// We will use regex for simplicity
+		// ^ Real bundler would most likely use an AST transform using Babel or similar
 		code = code.replace(
 			new RegExp(
 				// Escape '.' and '/'
 				`require\\(('|")${dependencyName.replace(/[\/.]/g, '\\$&')}\\1\\)`
 			),
-			modules.get(dependencyPath).code
+			`require(${dependency.id})`
 		);
 	}
-	metadata.code = code;
+	// Wrap the code and add it to output array
+	output.push(wrapModule(id, code));
 }
 
-// console.log(modules.get(entryPoint).code);
-// Output: console.log('apple ' + 'banana ' + 'kiwi ' + 'melon' + ' ' + 'tomato' + ' ' + 'kiwi ' + 'melon' + ' ' + 'tomato');
+// Add the `require` runtime at the beginning of the bundle
+output.unshift(fs.readFileSync('./require.js', 'utf-8'));
+// Require entry point at the end of the bundle (ID=0 first file processed)
+output.push(['requireModule(0);']);
 
-console.log(modules.get(entryPoint).code.replace(/' \+ '/g, ''));
-// Output: console.log('apple banana kiwi melon tomato kiwi melon tomato');
+const outputContent = output.join('\n');
 
-// ^ compiler that inlines modules (like rollup.js)
+if (options.output) {
+	fs.writeFileSync(options.output, outputContent);
+} else {
+	console.log('[OUTPUT]\n', outputContent);
+}
