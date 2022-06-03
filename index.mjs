@@ -1,11 +1,13 @@
 import JestHasteMap from 'jest-haste-map';
 import Resolver from 'jest-resolve';
 import { cpus } from 'os';
-import { dirname, resolve } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import yargs from 'yargs';
 import fs from 'fs';
+import { transformSync } from '@babel/core';
+import { Worker } from 'jest-worker';
 
 /**
  * I. Efficiently search for all files on the file system
@@ -26,7 +28,6 @@ const hasteMapOptions = {
 // Need to use `.default` as of Jest 27.
 const hasteMap = new JestHasteMap.default(hasteMapOptions);
 await hasteMap.setupCachePath(hasteMapOptions);
-
 const { hasteFS, moduleMap } = await hasteMap.build();
 
 // CLI options
@@ -114,35 +115,43 @@ console.log(chalk.bold(`❯ Serializing bundle`));
 const wrapModule = (id, code) =>
 	`define(${id}, function(module, exports, require) {\n${code}});`;
 
-// Array to contain code of each module
-const output = [];
+const worker = new Worker(
+	join(dirname(fileURLToPath(import.meta.url)), 'worker.js'),
+	{ enableWorkerThreads: true }
+);
 
-// Go through each module (backwards, to process the entry-point last)
-for (const [module, metadata] of Array.from(modules).reverse()) {
-	let { id, code } = metadata;
-	for (const [dependencyName, dependencyPath] of metadata.dependencyMap) {
-		const dependency = modules.get(dependencyPath);
-		// Swap out the reference the required module with the generated module.
-		// We will use regex for simplicity
-		// ^ Real bundler would most likely use an AST transform using Babel or similar
-		code = code.replace(
-			new RegExp(
-				// Escape '.' and '/'
-				`require\\(('|")${dependencyName.replace(/[\/.]/g, '\\$&')}\\1\\)`
-			),
-			`require(${dependency.id})`
-		);
-	}
-	// Wrap the code and add it to output array
-	output.push(wrapModule(id, code));
-}
+const results = await Promise.all(
+	Array.from(modules)
+		.reverse()
+		.map(async ([module, metadata]) => {
+			let { id, code } = metadata;
+			({ code } = await worker.transformFile(code));
 
-// Add the `require` runtime at the beginning of the bundle
-output.unshift(fs.readFileSync('./require.js', 'utf-8'));
-// Require entry point at the end of the bundle (ID=0 first file processed)
-output.push(['requireModule(0);']);
+			for (const [dependencyName, dependencyPath] of metadata.dependencyMap) {
+				const dependency = modules.get(dependencyPath);
+				// Swap out the reference the required module with the generated module.
+				// We will use regex for simplicity
+				// ^ Real bundler would most likely use an AST transform using Babel or similar
+				code = code.replace(
+					new RegExp(
+						// Escape '.' and '/'
+						`require\\(('|")${dependencyName.replace(/[\/.]/g, '\\$&')}\\1\\)`
+					),
+					`require(${dependency.id})`
+				);
+			}
+			return wrapModule(id, code);
+		})
+);
 
-const outputContent = output.join('\n');
+const output = [
+	// Add the `require` runtime at the beginning of the bundle
+	fs.readFileSync('./require.js', 'utf-8'),
+	// Append the results
+	...results,
+	// Require entry point at the end of the bundle (ID=0 first file processed)
+	'requireModule(0);',
+].join('\n');
 
 if (options.output) {
 	const outputDirectory = dirname(options.output);
@@ -151,7 +160,9 @@ if (options.output) {
 		fs.mkdirSync(outputDirectory);
 	}
 
-	fs.writeFileSync(options.output, outputContent);
+	fs.writeFileSync(options.output, output, 'utf-8');
 } else {
-	console.log('[OUTPUT]\n', outputContent);
+	console.log('[OUTPUT]\n', output);
 }
+
+worker.end();
