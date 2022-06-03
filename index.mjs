@@ -1,8 +1,7 @@
 import JestHasteMap from 'jest-haste-map';
 import Resolver from 'jest-resolve';
-import { DependencyResolver } from 'jest-resolve-dependencies';
 import { cpus } from 'os';
-import { dirname, join, resolve } from 'path';
+import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import yargs from 'yargs';
@@ -29,7 +28,6 @@ const hasteMap = new JestHasteMap.default(hasteMapOptions);
 await hasteMap.setupCachePath(hasteMapOptions);
 
 const { hasteFS, moduleMap } = await hasteMap.build();
-console.log(hasteFS.getAllFiles());
 
 // CLI options
 const options = yargs(process.argv).argv;
@@ -59,28 +57,43 @@ const resolver = new Resolver.default(moduleMap, {
 	rootDir: root,
 });
 
-const dependencyResolver = new DependencyResolver(resolver, hasteFS);
-
-const processedFiles = new Set();
+const seen = new Set();
+const modules = new Map();
 const queue = [entryPoint];
 
 while (!!queue.length) {
 	// Pick first element from queue
 	const module = queue.shift();
+
 	// Process each module only once
-	if (processedFiles.has(module)) {
+	if (seen.has(module)) {
 		continue;
 	}
-	// Process module
-	const moduleDependencies = dependencyResolver.resolve(module);
-	queue.push(...moduleDependencies);
-	// Mark module as processed
-	processedFiles.add(module);
-	// ^ This could be the part to add/remove test files or `require` calls
+	seen.add(module);
+
+	// Resolve each dependency and store it based on their required name
+	const dependencyMap = new Map(
+		hasteFS
+			.getDependencies(module)
+			.map((dependencyName) => [
+				dependencyName,
+				resolver.resolveModule(module, dependencyName),
+			])
+	);
+
+	// Read the content of file (code)
+	const code = fs.readFileSync(module, 'utf-8');
+	// Extract body of the module (everything after `module.exports =`)
+	const moduleBody = code.match(/module\.exports\s+=\s+(.*?);/)?.[1] || '';
+	const metadata = {
+		code: moduleBody || code,
+		dependencyMap,
+	};
+	modules.set(module, metadata);
+	queue.push(...dependencyMap.values());
 }
 
-console.log(chalk.bold(`❯ Found ${chalk.blue(processedFiles.size)} files`));
-console.log(Array.from(processedFiles));
+console.log(chalk.bold(`❯ Found ${chalk.blue(seen.size)} files`));
 
 /**
  * III. Serialize the bundle
@@ -91,14 +104,28 @@ console.log(Array.from(processedFiles));
  *
  */
 
-// Initial approach
 console.log(chalk.bold(`❯ Serializing bundle`));
-const allCode = [];
-await Promise.all(
-	Array.from(processedFiles).map(async (file) => {
-		const code = await fs.promises.readFile(file, 'utf8');
-		allCode.push(code);
-	})
-);
-console.log(allCode.join('\n'));
-// ^^^ includes require calls which browser doesn't understand
+
+// Go through each module (backwards, to process the entry-point last)
+for (const [module, metadata] of Array.from(modules).reverse()) {
+	let { code } = metadata;
+	for (const [dependencyName, dependencyPath] of metadata.dependencyMap) {
+		// Inline the module body of the dependency into the module that requires it
+		code = code.replace(
+			new RegExp(
+				// Escape '.' and '/'
+				`require\\(('|")${dependencyName.replace(/[\/.]/g, '\\$&')}\\1\\)`
+			),
+			modules.get(dependencyPath).code
+		);
+	}
+	metadata.code = code;
+}
+
+// console.log(modules.get(entryPoint).code);
+// Output: console.log('apple ' + 'banana ' + 'kiwi ' + 'melon' + ' ' + 'tomato' + ' ' + 'kiwi ' + 'melon' + ' ' + 'tomato');
+
+console.log(modules.get(entryPoint).code.replace(/' \+ '/g, ''));
+// Output: console.log('apple banana kiwi melon tomato kiwi melon tomato');
+
+// ^ compiler that inlines modules (like rollup.js)
