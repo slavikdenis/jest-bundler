@@ -2,6 +2,14 @@
 
 Based on [Building a JavaScript Bundler](https://cpojer.net/posts/building-a-javascript-bundler)
 
+## Usage
+
+```
+node index.mjs
+	--entry-point [entry_point]
+	--output [optional_output_file]
+```
+
 ## Functionality
 
 - Efficiently search for all files on the file system
