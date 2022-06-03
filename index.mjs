@@ -145,6 +145,12 @@ output.push(['requireModule(0);']);
 const outputContent = output.join('\n');
 
 if (options.output) {
+	const outputDirectory = dirname(options.output);
+
+	if (!fs.existsSync(outputDirectory)) {
+		fs.mkdirSync(outputDirectory);
+	}
+
 	fs.writeFileSync(options.output, outputContent);
 } else {
 	console.log('[OUTPUT]\n', outputContent);
