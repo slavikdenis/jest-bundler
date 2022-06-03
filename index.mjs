@@ -8,6 +8,7 @@ import yargs from 'yargs';
 import fs from 'fs';
 import { transformSync } from '@babel/core';
 import { Worker } from 'jest-worker';
+import { minify } from 'terser';
 
 /**
  * I. Efficiently search for all files on the file system
@@ -144,7 +145,7 @@ const results = await Promise.all(
 		})
 );
 
-const output = [
+let output = [
 	// Add the `require` runtime at the beginning of the bundle
 	fs.readFileSync('./require.js', 'utf-8'),
 	// Append the results
@@ -152,6 +153,15 @@ const output = [
 	// Require entry point at the end of the bundle (ID=0 first file processed)
 	'requireModule(0);',
 ].join('\n');
+
+/**
+ * Minifier
+ */
+if (options.minify) {
+	console.log(chalk.bold(`❯ Minifying code`));
+	const minifiedOutput = await minify(output, { sourceMap: true });
+	output = minifiedOutput.code ?? output;
+}
 
 if (options.output) {
 	const outputDirectory = dirname(options.output);

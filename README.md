@@ -8,6 +8,7 @@ Based on [Building a JavaScript Bundler](https://cpojer.net/posts/building-a-jav
 node index.mjs
 	--entry-point [entry_point]
 	--output [optional_output_file]
+	--minify
 ```
 
 ## Functionality
@@ -17,3 +18,4 @@ node index.mjs
 - Serialize the bundle
 - Execute our bundle using a runtime
 - Compile each file in parallel
+- Minifying

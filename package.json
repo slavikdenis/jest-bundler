@@ -13,6 +13,7 @@
     "jest-haste-map": "^28.1.0",
     "jest-resolve": "^28.1.0",
     "jest-worker": "^28.1.0",
+    "terser": "^5.14.0",
     "yargs": "^17.5.1"
   }
 }
