@@ -1,11 +1,13 @@
-const { transformSync } = require('@babel/core');
+const { transformAsync } = require('@babel/core');
 
-exports.transformFile = function (code) {
+exports.transformFile = async function (code) {
 	const transformResult = { code: '' };
 	try {
-		transformResult.code = transformSync(code, {
+		const { code: transformedCode } = await transformAsync(code, {
 			plugins: ['@babel/plugin-transform-modules-commonjs'],
-		}).code;
+		});
+
+		transformResult.code = transformedCode ?? code;
 	} catch (error) {
 		transformResult.errorMessage = error.message;
 	}
