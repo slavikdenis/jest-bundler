@@ -172,7 +172,8 @@ if (options.output) {
 
 	fs.writeFileSync(options.output, output, 'utf-8');
 } else {
-	console.log('[OUTPUT]\n', output);
+	console.log(chalk.bold(`❯ Output\n`));
+	console.log(chalk.bgCyan(output, '\n'));
 }
 
 worker.end();
