@@ -6,9 +6,10 @@ Based on [Building a JavaScript Bundler](https://cpojer.net/posts/building-a-jav
 
 ```
 node index.mjs
-	--entry-point [entry_point]
-	--output [optional_output_file]
-	--minify
+	--entry-point [entry_point] (required: entry point file)
+	--output [path_to_output_file] (optional: output file path, if not present, output is printed on stdout)
+	--minify (optional: minification of output)
+	--dev (optional: start dev server with bundled file)
 ```
 
 ## Functionality
@@ -19,3 +20,4 @@ node index.mjs
 - Execute our bundle using a runtime
 - Compile each file in parallel
 - Minifying
+- Development server

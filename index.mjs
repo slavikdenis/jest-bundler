@@ -9,6 +9,7 @@ import fs from 'fs';
 import { transformSync } from '@babel/core';
 import { Worker } from 'jest-worker';
 import { minify } from 'terser';
+import { execSync } from 'child_process';
 
 /**
  * I. Efficiently search for all files on the file system
@@ -116,10 +117,9 @@ console.log(chalk.bold(`❯ Serializing bundle`));
 const wrapModule = (id, code) =>
 	`define(${id}, function(module, exports, require) {\n${code}});`;
 
-const worker = new Worker(
-	join(dirname(fileURLToPath(import.meta.url)), 'worker.js'),
-	{ enableWorkerThreads: true }
-);
+const worker = new Worker(join(root, 'worker.js'), {
+	enableWorkerThreads: true,
+});
 
 const results = await Promise.all(
 	Array.from(modules)
@@ -163,6 +163,9 @@ if (options.minify) {
 	output = minifiedOutput.code ?? output;
 }
 
+/**
+ * Output
+ */
 if (options.output) {
 	const outputDirectory = dirname(options.output);
 
@@ -177,3 +180,38 @@ if (options.output) {
 }
 
 worker.end();
+
+/**
+ * Development HTTP server
+ */
+if (options.dev) {
+	console.log(chalk.bold(`❯ Running dev server\n`));
+
+	// Write content for dev server
+	const publicDirectory = join(root, 'public');
+
+	if (!fs.existsSync(publicDirectory)) {
+		fs.mkdirSync(publicDirectory);
+	}
+
+	// Write JS file
+	fs.writeFileSync(join(publicDirectory, 'index.js'), output, 'utf-8');
+
+	// Write HTML file
+	const htmlFile = `<!DOCTYPE html>
+	<html>
+		<body>
+			<h2>Running dev HTTP server with bundled code</h2>
+			<script src="index.js?v=${new Date().getTime()}"></script>
+		</body>
+	</html>
+	`;
+
+	fs.writeFileSync(join(publicDirectory, 'index.html'), htmlFile, 'utf-8');
+
+	execSync('yarn start-dev-server', {
+		cwd: root,
+		encoding: 'utf-8',
+		stdio: 'inherit',
+	});
+}

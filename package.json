@@ -6,10 +6,14 @@
   "author": "Denis Slavik <denis.slavik@gmail.com>",
   "license": "MIT",
   "private": false,
+  "scripts": {
+    "start-dev-server": "http-server ./public -o -c-1"
+  },
   "dependencies": {
     "@babel/core": "^7.18.2",
     "@babel/plugin-transform-modules-commonjs": "^7.18.2",
     "chalk": "^5.0.1",
+    "http-server": "^14.1.1",
     "jest-haste-map": "^28.1.0",
     "jest-resolve": "^28.1.0",
     "jest-worker": "^28.1.0",

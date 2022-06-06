@@ -35,3 +35,6 @@ typings/
 
 # build
 dist
+
+# dev
+public
