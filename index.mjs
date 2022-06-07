@@ -171,7 +171,11 @@ if (options.minify) {
 					url: `${basename(options.output)}.map`,
 					includeSources: true,
 			  }
-			: false,
+			: {
+					root: 'index.js',
+					url: 'inline',
+					includeSources: true,
+			  },
 	});
 
 	output = minifiedOutput.code ?? output;
