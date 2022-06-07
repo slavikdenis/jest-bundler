@@ -1,7 +1,7 @@
 import JestHasteMap from 'jest-haste-map';
 import Resolver from 'jest-resolve';
 import { cpus } from 'os';
-import { join, dirname, resolve } from 'path';
+import { join, dirname, resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import yargs from 'yargs';
@@ -157,10 +157,25 @@ let output = [
 /**
  * Minifier
  */
+let sourceMap = null;
+
 if (options.minify) {
 	console.log(chalk.bold(`❯ Minifying code`));
-	const minifiedOutput = await minify(output, { sourceMap: true });
+
+	const outputDirectory = options.output ? dirname(options.output) : null;
+
+	const minifiedOutput = await minify(output, {
+		sourceMap: !!options.output
+			? {
+					root: basename(options.output),
+					url: `${basename(options.output)}.map`,
+					includeSources: true,
+			  }
+			: false,
+	});
+
 	output = minifiedOutput.code ?? output;
+	sourceMap = minifiedOutput.map;
 }
 
 /**
@@ -174,6 +189,10 @@ if (options.output) {
 	}
 
 	fs.writeFileSync(options.output, output, 'utf-8');
+
+	if (sourceMap) {
+		fs.writeFileSync(`${options.output}.map`, sourceMap, 'utf-8');
+	}
 } else {
 	console.log(chalk.bold(`❯ Output\n`));
 	console.log(chalk.bgCyan(output, '\n'));
@@ -194,15 +213,27 @@ if (options.dev) {
 		fs.mkdirSync(publicDirectory);
 	}
 
+	const outputBaseName = options.output ? basename(options.output) : null;
+	const outputFileName = outputBaseName ? outputBaseName : 'index.js';
+
 	// Write JS file
-	fs.writeFileSync(join(publicDirectory, 'index.js'), output, 'utf-8');
+	fs.writeFileSync(join(publicDirectory, outputFileName), output, 'utf-8');
+
+	// Write Source map file
+	if (sourceMap) {
+		fs.writeFileSync(
+			join(publicDirectory, `${outputFileName}.map`),
+			sourceMap,
+			'utf-8'
+		);
+	}
 
 	// Write HTML file
 	const htmlFile = `<!DOCTYPE html>
 	<html>
 		<body>
 			<h2>Running dev HTTP server with bundled code</h2>
-			<script src="index.js?v=${new Date().getTime()}"></script>
+			<script src="${outputFileName}?v=${new Date().getTime()}"></script>
 		</body>
 	</html>
 	`;

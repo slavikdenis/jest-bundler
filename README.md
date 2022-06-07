@@ -7,9 +7,9 @@ Based on [Building a JavaScript Bundler](https://cpojer.net/posts/building-a-jav
 ```
 node index.mjs
 	--entry-point [entry_point] (required: entry point file)
-	--output [path_to_output_file] (optional: output file path, if not present, output is printed on stdout)
-	--minify (optional: minification of output)
-	--dev (optional: start dev server with bundled file)
+	--output [path_to_output_file] (optional: output file path)
+	--minify (optional: minification of output & generate source map)
+	--dev (optional: start dev server)
 ```
 
 ## Functionality
