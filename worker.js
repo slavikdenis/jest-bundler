@@ -1,5 +1,9 @@
 const { transformAsync } = require('@babel/core');
 
+/**
+ * V. Compile each file in parallel
+ */
+
 exports.transformFile = async function (code) {
 	const transformResult = { code: '' };
 	try {

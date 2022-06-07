@@ -155,7 +155,7 @@ let output = [
 ].join('\n');
 
 /**
- * Minifier
+ * VI. Minifier
  */
 let sourceMap = null;
 
@@ -205,7 +205,7 @@ if (options.output) {
 worker.end();
 
 /**
- * Development HTTP server
+ * VII. Development HTTP server
  */
 if (options.dev) {
 	console.log(chalk.bold(`❯ Running dev server\n`));
